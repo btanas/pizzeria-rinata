@@ -206,6 +206,67 @@
         </div>
       </div>
 
+      <!-- Крок 1б: вибір дії -->
+      <div id="step-choice" class="hidden">
+        <h3 class="admin-title">Admin</h3>
+        <div class="choice-btns">
+          <button class="btn-gold" id="btn-go-pizza">Pizza del Giorno</button>
+          <button class="btn-gold" id="btn-go-prices">Prezzi del Menu</button>
+          <button class="btn-gold" id="btn-go-menu">Gestisci Menu</button>
+        </div>
+        <div class="admin-btns">
+          <button class="btn-sec" id="btn-cancel-choice">✕ Chiudi</button>
+        </div>
+      </div>
+
+      <!-- Крок 4: редагування меню -->
+      <div id="step-menu" class="hidden">
+        <h3 class="admin-title">Gestisci Menu</h3>
+        <div class="price-tabs" id="menu-edit-tabs">
+          <button class="price-tab-btn active" data-section="pizze">Pizze</button>
+          <button class="price-tab-btn" data-section="antipasti">Antipasti</button>
+          <button class="price-tab-btn" data-section="insalate">Insalate</button>
+          <button class="price-tab-btn" data-section="fritti">Fritti</button>
+          <button class="price-tab-btn" data-section="bevande">Bevande</button>
+        </div>
+        <div id="menu-edit-list" class="menu-edit-list"></div>
+        <div id="menu-add-form" class="menu-add-form hidden">
+          <input type="text" id="add-name" placeholder="Nome">
+          <input type="text" id="add-price" placeholder="Prezzo (es. €9)">
+          <select id="add-type">
+            <option value="Rossa">Rossa</option>
+            <option value="Bianca">Bianca</option>
+            <option value="Schiaccia">Schiaccia</option>
+          </select>
+          <textarea id="add-ing" rows="2" placeholder="Ingredienti (italiano)"></textarea>
+          <div class="admin-btns">
+            <button class="btn-gold" id="btn-confirm-add">Aggiungi ✓</button>
+            <button class="btn-sec" id="btn-hide-add">Annulla</button>
+          </div>
+        </div>
+        <div class="admin-btns">
+          <button class="btn-gold" id="btn-show-add">+ Aggiungi</button>
+          <button class="btn-sec" id="btn-cancel-menu">Chiudi</button>
+        </div>
+      </div>
+
+      <!-- Крок 3: ціни меню -->
+      <div id="step-prices" class="hidden">
+        <h3 class="admin-title">Prezzi del Menu</h3>
+        <div class="price-tabs">
+          <button class="price-tab-btn active" data-section="pizze">Pizze</button>
+          <button class="price-tab-btn" data-section="antipasti">Antipasti</button>
+          <button class="price-tab-btn" data-section="insalate">Insalate</button>
+          <button class="price-tab-btn" data-section="fritti">Fritti</button>
+          <button class="price-tab-btn" data-section="bevande">Bevande</button>
+        </div>
+        <div id="price-list" class="price-list"></div>
+        <div class="admin-btns">
+          <button class="btn-gold" id="btn-save-prices">Salva ✓</button>
+          <button class="btn-sec" id="btn-cancel-prices">Annulla</button>
+        </div>
+      </div>
+
       <!-- Крок 2: редагування -->
       <div id="step-edit" class="hidden">
         <h3 class="admin-title">Pizza del Giorno</h3>
@@ -228,6 +289,10 @@
           <input type="file" id="edit-photo" accept="image/*" style="display:none">
           <button class="btn-remove-photo hidden" id="btn-remove-photo" type="button">Rimuovi foto</button>
         </div>
+        <label class="toggle-wrap">
+          <input type="checkbox" id="edit-visible" checked>
+          <span>Mostra sul sito</span>
+        </label>
         <div class="admin-btns">
           <button class="btn-gold" id="btn-save">Salva ✓</button>
           <button class="btn-sec" id="btn-cancel-edit">Annulla</button>
@@ -237,6 +302,7 @@
     </div>
   </div>
 
+  <input type="file" id="mei-photo-input" accept="image/*" style="display:none">
   <script src="app.js"></script>
 </body>
 </html>

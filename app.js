@@ -466,8 +466,12 @@ function translateIngredients(text, targetLang) {
 // Per cambiare la password — modifica la riga qui sotto
 // ============================================================
 const ADMIN_PASSWORD = 'Rinata2025';
-const LS_PIZZA_KEY  = 'rinata_pizza_day';
-const LS_PHOTO_KEY  = 'rinata_pizza_photo';
+const LS_PIZZA_KEY   = 'rinata_pizza_day';
+const LS_PHOTO_KEY   = 'rinata_pizza_photo';
+const LS_PRICES_KEY  = 'rinata_prices';
+const LS_VISIBLE_KEY = 'rinata_pizza_visible';
+const LS_MENU_KEY        = 'rinata_menu_data';
+const LS_ITEM_PHOTOS_KEY = 'rinata_item_photos';
 
 // ============================================================
 // STATE
@@ -475,6 +479,59 @@ const LS_PHOTO_KEY  = 'rinata_pizza_photo';
 let lang = 'it';
 let activeTab = 'pizze';
 let pdIngredients = ''; // завжди зберігається як Italian
+let savedPrices       = {};
+let dynamicMenu       = null;
+let itemPhotos        = {}; // { pizze: { 'MARINARA': 'data:...' }, ... }
+let currentPhotoTarget = null; // { section, name }
+
+function loadItemPhotos() {
+  try {
+    const raw = localStorage.getItem(LS_ITEM_PHOTOS_KEY);
+    if (raw) itemPhotos = JSON.parse(raw);
+  } catch(e) {}
+}
+
+function saveItemPhotos() {
+  localStorage.setItem(LS_ITEM_PHOTOS_KEY, JSON.stringify(itemPhotos));
+}
+
+function getItemPhoto(section, name) {
+  return (itemPhotos[section] && itemPhotos[section][name]) || '';
+}
+
+function getMenu() { return dynamicMenu || MENU; }
+
+function ensureDynamicMenu() {
+  if (!dynamicMenu) dynamicMenu = JSON.parse(JSON.stringify(MENU));
+}
+
+function loadDynamicMenu() {
+  try {
+    const raw = localStorage.getItem(LS_MENU_KEY);
+    if (raw) dynamicMenu = JSON.parse(raw);
+  } catch(e) {}
+}
+
+function saveDynamicMenu() {
+  localStorage.setItem(LS_MENU_KEY, JSON.stringify(dynamicMenu));
+}
+
+function getIngDisplay(ing, targetLang) {
+  if (!ing) return '';
+  if (typeof ing === 'object') return ing[targetLang] || ing.it || '';
+  return translateIngredients(ing, targetLang);
+}
+
+function loadSavedPrices() {
+  try {
+    const raw = localStorage.getItem(LS_PRICES_KEY);
+    if (raw) savedPrices = JSON.parse(raw);
+  } catch(e) {}
+}
+
+function getPrice(section, item) {
+  return (savedPrices[section] && savedPrices[section][item.name]) || item.price;
+}
 
 // ============================================================
 // LANGUAGE
@@ -515,38 +572,50 @@ function renderMenu(tab) {
   const container = document.getElementById('menu-content');
 
   if (tab === 'pizze') {
-    const cards = MENU.pizze.map(p => `
+    const cards = getMenu().pizze.map(p => {
+      const photo = getItemPhoto('pizze', p.name);
+      return `
       <div class="pizza-card">
+        ${photo ? `<img class="pizza-card-photo" src="${photo}" alt="${p.name}">` : ''}
         <div class="pizza-card-header">
           <div class="pizza-card-name">${p.name}</div>
-          <div class="pizza-card-price">${p.price}</div>
+          <div class="pizza-card-price">${getPrice('pizze', p)}</div>
         </div>
-        <div class="pizza-card-type badge-${p.type}">${t[p.type]}</div>
-        <div class="pizza-card-ing">${p.ing[lang] || p.ing.it}</div>
-      </div>`).join('');
+        <div class="pizza-card-type badge-${p.type}">${t[p.type] || p.type}</div>
+        <div class="pizza-card-ing">${getIngDisplay(p.ing, lang)}</div>
+      </div>`;
+    }).join('');
 
     container.innerHTML = `
       <div class="pizza-grid">${cards}</div>
       <div class="menu-extras-wrap"><div class="menu-extras">${t.extras}</div></div>`;
 
   } else if (tab === 'insalate') {
-    const items = MENU.insalate.map(it => `
+    const items = getMenu().insalate.map(it => {
+      const photo = getItemPhoto('insalate', it.name);
+      return `
       <div class="simple-item">
-        <div>
+        ${photo ? `<img class="simple-item-photo" src="${photo}" alt="${it.name}">` : ''}
+        <div class="simple-item-text">
           <div class="simple-item-name">${it.name}</div>
-          <div class="simple-item-sub">${it.ing[lang] || it.ing.it}</div>
+          ${it.ing ? `<div class="simple-item-sub">${getIngDisplay(it.ing, lang)}</div>` : ''}
         </div>
-        <div class="simple-item-price">${it.price}</div>
-      </div>`).join('');
+        <div class="simple-item-price">${getPrice('insalate', it)}</div>
+      </div>`;
+    }).join('');
 
     container.innerHTML = `<div class="simple-list">${items}</div>`;
 
   } else {
-    const items = MENU[tab].map(it => `
+    const items = getMenu()[tab].map(it => {
+      const photo = getItemPhoto(tab, it.name);
+      return `
       <div class="simple-item">
+        ${photo ? `<img class="simple-item-photo" src="${photo}" alt="${it.name}">` : ''}
         <div class="simple-item-name">${it.name}</div>
-        <div class="simple-item-price">${it.price}</div>
-      </div>`).join('');
+        <div class="simple-item-price">${getPrice(tab, it)}</div>
+      </div>`;
+    }).join('');
 
     container.innerHTML = `<div class="simple-list">${items}</div>`;
   }
@@ -555,6 +624,10 @@ function renderMenu(tab) {
 // ============================================================
 // PIZZA DEL GIORNO — load / save
 // ============================================================
+function applyPizzaVisibility(visible) {
+  document.getElementById('pizza-day').style.display = visible ? '' : 'none';
+}
+
 function applyPizzaPhoto(src) {
   const img = document.getElementById('pd-photo');
   if (src) {
@@ -580,9 +653,10 @@ function loadPizzaDelGiorno() {
     }
   } catch (e) {}
   applyPizzaPhoto(localStorage.getItem(LS_PHOTO_KEY) || '');
+  applyPizzaVisibility(localStorage.getItem(LS_VISIBLE_KEY) !== 'false');
 }
 
-function savePizzaDelGiorno(name, price, type, ing, photoSrc) {
+function savePizzaDelGiorno(name, price, type, ing, photoSrc, visible) {
   pdIngredients = ing;
   localStorage.setItem(LS_PIZZA_KEY, JSON.stringify({ name, price, type, ing }));
   if (photoSrc !== null) {
@@ -597,6 +671,8 @@ function savePizzaDelGiorno(name, price, type, ing, photoSrc) {
   document.querySelector('.pd-type').textContent        = type;
   document.querySelector('.pd-ingredients').textContent = translateIngredients(ing, lang);
   applyPizzaPhoto(photoSrc !== null ? photoSrc : (localStorage.getItem(LS_PHOTO_KEY) || ''));
+  localStorage.setItem(LS_VISIBLE_KEY, visible ? 'true' : 'false');
+  applyPizzaVisibility(visible);
 }
 
 // ============================================================
@@ -606,7 +682,10 @@ function initAdmin() {
   const trigger      = document.getElementById('admin-trigger');
   const overlay      = document.getElementById('admin-overlay');
   const stepPass     = document.getElementById('step-pass');
+  const stepChoice   = document.getElementById('step-choice');
   const stepEdit     = document.getElementById('step-edit');
+  const stepPrices   = document.getElementById('step-prices');
+  const stepMenuEdit = document.getElementById('step-menu');
   const passInput    = document.getElementById('admin-pass');
   const passErr      = document.getElementById('admin-err');
   const btnLogin     = document.getElementById('btn-login');
@@ -652,10 +731,14 @@ function initAdmin() {
     editPhoto.value = '';
   });
 
+  function hideAllSteps() {
+    [stepPass, stepChoice, stepEdit, stepPrices, stepMenuEdit].forEach(s => s.classList.add('hidden'));
+  }
+
   function openOverlay() {
     overlay.classList.remove('hidden');
+    hideAllSteps();
     stepPass.classList.remove('hidden');
-    stepEdit.classList.add('hidden');
     passInput.value = '';
     passErr.classList.add('hidden');
     setTimeout(() => passInput.focus(), 50);
@@ -666,8 +749,167 @@ function initAdmin() {
     passInput.value = '';
   }
 
+  function showChoiceStep() {
+    hideAllSteps();
+    stepChoice.classList.remove('hidden');
+  }
+
+  // --- Prices admin ---
+  let activePriceSection = 'pizze';
+
+  function renderPriceList(section) {
+    activePriceSection = section;
+    document.querySelectorAll('.price-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.section === section);
+    });
+    const items = MENU[section];
+    const prices = savedPrices[section] || {};
+    document.getElementById('price-list').innerHTML = items.map(item => `
+      <div class="price-item">
+        <div class="price-item-name">${item.name}</div>
+        <input class="price-input" data-section="${section}" data-name="${item.name.replace(/"/g,'&quot;')}"
+               value="${(prices[item.name] || item.price).replace(/"/g,'&quot;')}" type="text">
+      </div>`).join('');
+  }
+
+  function showPricesStep() {
+    hideAllSteps();
+    stepPrices.classList.remove('hidden');
+    renderPriceList('pizze');
+  }
+
+  // --- Menu editor ---
+  let activeMenuSection = 'pizze';
+
+  function renderMenuEditList(section) {
+    activeMenuSection = section;
+    document.querySelectorAll('#menu-edit-tabs .price-tab-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.section === section);
+    });
+    const items = getMenu()[section];
+    document.getElementById('menu-edit-list').innerHTML = items.map((item, i) => {
+      const photo = getItemPhoto(section, item.name);
+      return `
+      <div class="menu-edit-item">
+        <div class="mei-thumb-wrap">
+          ${photo
+            ? `<img class="mei-thumb" src="${photo}" alt="">`
+            : `<div class="mei-thumb-empty"></div>`}
+        </div>
+        <div class="mei-info">
+          <div class="mei-name">${item.name}</div>
+          <div class="mei-price">${getPrice(section, item)}</div>
+        </div>
+        <div class="mei-actions">
+          <button class="mei-btn mei-foto" data-action="photo" data-i="${i}" title="Foto">foto</button>
+          ${photo ? `<button class="mei-btn mei-del" data-action="dephoto" data-i="${i}" title="Rimuovi foto">✕f</button>` : ''}
+          <button class="mei-btn" data-action="up"  data-i="${i}" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button class="mei-btn" data-action="down" data-i="${i}" ${i === items.length-1 ? 'disabled' : ''}>↓</button>
+          <button class="mei-btn mei-del" data-action="del" data-i="${i}">×</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    document.querySelectorAll('.mei-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleMenuAction(btn.dataset.action, parseInt(btn.dataset.i)));
+    });
+    document.getElementById('menu-add-form').classList.add('hidden');
+  }
+
+  function handleMenuAction(action, idx) {
+    ensureDynamicMenu();
+    const arr = dynamicMenu[activeMenuSection];
+    const itemName = arr[idx] ? arr[idx].name : '';
+
+    if (action === 'photo') {
+      currentPhotoTarget = { section: activeMenuSection, name: itemName };
+      document.getElementById('mei-photo-input').click();
+      return;
+    } else if (action === 'dephoto') {
+      if (itemPhotos[activeMenuSection]) delete itemPhotos[activeMenuSection][itemName];
+      saveItemPhotos();
+    } else if (action === 'up' && idx > 0) {
+      [arr[idx-1], arr[idx]] = [arr[idx], arr[idx-1]];
+      saveDynamicMenu();
+    } else if (action === 'down' && idx < arr.length - 1) {
+      [arr[idx], arr[idx+1]] = [arr[idx+1], arr[idx]];
+      saveDynamicMenu();
+    } else if (action === 'del') {
+      if (!confirm(`Eliminare "${itemName}"?`)) return;
+      arr.splice(idx, 1);
+      saveDynamicMenu();
+    }
+    renderMenuEditList(activeMenuSection);
+    renderMenu(activeTab);
+  }
+
+  function showMenuStep() {
+    hideAllSteps();
+    stepMenuEdit.classList.remove('hidden');
+    renderMenuEditList('pizze');
+  }
+
+  function showAddForm() {
+    const section = activeMenuSection;
+    const needsType = section === 'pizze';
+    const needsIng  = section === 'pizze' || section === 'insalate';
+    document.getElementById('add-name').value  = '';
+    document.getElementById('add-price').value = '';
+    document.getElementById('add-ing').value   = '';
+    document.getElementById('add-type').classList.toggle('hidden', !needsType);
+    document.getElementById('add-ing').classList.toggle('hidden', !needsIng);
+    document.getElementById('menu-add-form').classList.remove('hidden');
+    document.getElementById('add-name').focus();
+  }
+
+  function confirmAdd() {
+    const name  = document.getElementById('add-name').value.trim();
+    const price = document.getElementById('add-price').value.trim();
+    if (!name || !price) return;
+    ensureDynamicMenu();
+    const newItem = { name, price };
+    if (activeMenuSection === 'pizze') {
+      newItem.type = document.getElementById('add-type').value;
+      newItem.ing  = document.getElementById('add-ing').value.trim();
+    } else if (activeMenuSection === 'insalate') {
+      newItem.ing = document.getElementById('add-ing').value.trim();
+    }
+    dynamicMenu[activeMenuSection].push(newItem);
+    saveDynamicMenu();
+    renderMenuEditList(activeMenuSection);
+    renderMenu(activeTab);
+  }
+
+  document.getElementById('mei-photo-input').addEventListener('change', function() {
+    const file = this.files[0];
+    if (!file || !currentPhotoTarget) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+      const { section, name } = currentPhotoTarget;
+      if (!itemPhotos[section]) itemPhotos[section] = {};
+      itemPhotos[section][name] = e.target.result;
+      saveItemPhotos();
+      renderMenuEditList(activeMenuSection);
+      renderMenu(activeTab);
+      this.value = '';
+      currentPhotoTarget = null;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('btn-go-menu').addEventListener('click', showMenuStep);
+  document.getElementById('btn-cancel-menu').addEventListener('click', closeOverlay);
+  document.getElementById('btn-show-add').addEventListener('click', showAddForm);
+  document.getElementById('btn-hide-add').addEventListener('click', () => {
+    document.getElementById('menu-add-form').classList.add('hidden');
+  });
+  document.getElementById('btn-confirm-add').addEventListener('click', confirmAdd);
+  document.querySelectorAll('#menu-edit-tabs .price-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => renderMenuEditList(btn.dataset.section));
+  });
+
   function showEditForm() {
-    stepPass.classList.add('hidden');
+    hideAllSteps();
     stepEdit.classList.remove('hidden');
     editName.value  = document.querySelector('.pd-name').textContent;
     editPrice.value = document.querySelector('.pd-price').textContent;
@@ -678,12 +920,35 @@ function initAdmin() {
     pendingPhotoSrc = null;
     editPhoto.value = '';
     updatePhotoPreview(localStorage.getItem(LS_PHOTO_KEY) || '');
+    document.getElementById('edit-visible').checked = localStorage.getItem(LS_VISIBLE_KEY) !== 'false';
     setTimeout(() => editName.focus(), 50);
   }
 
   trigger.addEventListener('click', openOverlay);
   btnCancel.addEventListener('click', closeOverlay);
   btnCancelEdit.addEventListener('click', closeOverlay);
+  document.getElementById('btn-cancel-choice').addEventListener('click', closeOverlay);
+  document.getElementById('btn-cancel-prices').addEventListener('click', closeOverlay);
+  document.getElementById('btn-go-pizza').addEventListener('click', showEditForm);
+  document.getElementById('btn-go-prices').addEventListener('click', showPricesStep);
+
+  document.querySelectorAll('.price-tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => renderPriceList(btn.dataset.section));
+  });
+
+  document.getElementById('btn-save-prices').addEventListener('click', () => {
+    document.querySelectorAll('.price-input').forEach(input => {
+      const section = input.dataset.section;
+      const name    = input.dataset.name;
+      const value   = input.value.trim();
+      if (!savedPrices[section]) savedPrices[section] = {};
+      if (value) savedPrices[section][name] = value;
+    });
+    localStorage.setItem(LS_PRICES_KEY, JSON.stringify(savedPrices));
+    renderMenu(activeTab);
+    closeOverlay();
+  });
+
   overlay.addEventListener('click', e => { if (e.target === overlay) closeOverlay(); });
 
   document.addEventListener('keydown', e => {
@@ -693,7 +958,7 @@ function initAdmin() {
   btnLogin.addEventListener('click', () => {
     if (passInput.value === ADMIN_PASSWORD) {
       passErr.classList.add('hidden');
-      showEditForm();
+      showChoiceStep();
     } else {
       passErr.classList.remove('hidden');
       passInput.value = '';
@@ -711,7 +976,8 @@ function initAdmin() {
     const type  = editType.value;
     const ing   = editIng.value.trim();
     if (!name || !price) return;
-    savePizzaDelGiorno(name, price, type, ing, pendingPhotoSrc);
+    const visible = document.getElementById('edit-visible').checked;
+    savePizzaDelGiorno(name, price, type, ing, pendingPhotoSrc, visible);
     closeOverlay();
   });
 }
@@ -771,6 +1037,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('.mobile-nav a').forEach(a => {
     a.addEventListener('click', () => mobileNav.classList.remove('open'));
   });
+
+  // Load dynamic menu, prices, item photos
+  loadDynamicMenu();
+  loadSavedPrices();
+  loadItemPhotos();
 
   // Init pdIngredients from default HTML content (Italian)
   pdIngredients = document.querySelector('.pd-ingredients').textContent.trim();
