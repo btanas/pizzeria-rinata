@@ -477,7 +477,7 @@ const LS_ITEM_PHOTOS_KEY = 'rinata_item_photos';
 // STATE
 // ============================================================
 let lang = 'it';
-let activeTab = 'pizze';
+let activeTab = 'antipasti';
 let pdIngredients = ''; // завжди зберігається як Italian
 let savedPrices       = {};
 let dynamicMenu       = null;
@@ -1054,5 +1054,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize translations + menu
   setLang(lang);
-  renderMenu('pizze');
+  renderMenu('antipasti');
 });
